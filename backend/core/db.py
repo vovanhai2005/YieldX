@@ -15,7 +15,9 @@ Architecture notes for time-series financial data:
 
 from datetime import datetime
 from contextlib import contextmanager
-from typing import Generator
+from typing import Annotated, Generator
+
+from fastapi import Depends
 
 from sqlalchemy import create_engine, DateTime, func, insert
 from sqlalchemy.orm import (
@@ -101,7 +103,7 @@ def get_db() -> Generator[Session, None, None]:
 
     Usage:
         @router.get("/items")
-        def read_items(db: Session = Depends(get_db)):
+        def read_items(db: SessionDep):
             return db.query(Item).all()
     """
     db = SessionLocal()
@@ -109,6 +111,9 @@ def get_db() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
+
+
+SessionDep = Annotated[Session, Depends(get_db)]
 
 
 @contextmanager

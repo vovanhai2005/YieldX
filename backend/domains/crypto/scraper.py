@@ -58,7 +58,9 @@ def _safe_decimal(value) -> Decimal | None:
         return None
 
 
-def _fetch_coingecko_markets(vs_currency: str = "usd", per_page: int = 20) -> list[dict]:
+def _fetch_coingecko_markets(
+    vs_currency: str = "usd", per_page: int = 20
+) -> list[dict]:
     """Fetch market data from CoinGecko."""
     params = {
         "vs_currency": vs_currency,
@@ -117,7 +119,9 @@ def _scrape_coingecko() -> list[dict]:
                 "price_vnd": vnd_prices.get(coin_id),
                 "market_cap_usd": _safe_decimal(coin.get("market_cap")),
                 "volume_24h_usd": _safe_decimal(coin.get("total_volume")),
-                "change_24h_pct": _safe_decimal(coin.get("price_change_percentage_24h")),
+                "change_24h_pct": _safe_decimal(
+                    coin.get("price_change_percentage_24h")
+                ),
                 "source": "CoinGecko",
                 "scraped_at": now,
             }

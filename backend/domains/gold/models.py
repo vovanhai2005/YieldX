@@ -25,9 +25,7 @@ class GoldPrice(Base, TimeSeriesMixin):
 
     __tablename__ = "gold_prices"
 
-    id: Mapped[int] = mapped_column(
-        BigInteger, primary_key=True, autoincrement=True
-    )
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     brand: Mapped[str] = mapped_column(
         String(50),
         nullable=False,

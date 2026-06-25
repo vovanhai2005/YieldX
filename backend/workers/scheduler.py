@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 
 scheduler = BackgroundScheduler(
     job_defaults={
-        "coalesce": True,       # If multiple runs are missed, only run once
-        "max_instances": 1,     # Never run the same job concurrently
+        "coalesce": True,  # If multiple runs are missed, only run once
+        "max_instances": 1,  # Never run the same job concurrently
         "misfire_grace_time": 60,
     }
 )
@@ -36,6 +36,7 @@ def _run_gold_scraper():
     """Wrapper to run gold scraper with error handling."""
     try:
         from domains.gold.scraper import scrape_gold
+
         count = scrape_gold()
         logger.info("[Scheduler] Gold scrape completed: %d records", count)
     except Exception as exc:
@@ -46,6 +47,7 @@ def _run_bank_rates_scraper():
     """Wrapper to run bank rates scraper with error handling."""
     try:
         from domains.bank_rates.scraper import scrape_bank_rates
+
         count = scrape_bank_rates()
         logger.info("[Scheduler] Bank rates scrape completed: %d records", count)
     except Exception as exc:
@@ -56,6 +58,7 @@ def _run_forex_scraper():
     """Wrapper to run forex scraper with error handling."""
     try:
         from domains.forex.scraper import scrape_forex
+
         count = scrape_forex()
         logger.info("[Scheduler] Forex scrape completed: %d records", count)
     except Exception as exc:
@@ -66,6 +69,7 @@ def _run_crypto_scraper():
     """Wrapper to run crypto scraper with error handling."""
     try:
         from domains.crypto.scraper import scrape_crypto
+
         count = scrape_crypto()
         logger.info("[Scheduler] Crypto scrape completed: %d records", count)
     except Exception as exc:

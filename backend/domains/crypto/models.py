@@ -25,9 +25,7 @@ class CryptoPrice(Base, TimeSeriesMixin):
 
     __tablename__ = "crypto_prices"
 
-    id: Mapped[int] = mapped_column(
-        BigInteger, primary_key=True, autoincrement=True
-    )
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     symbol: Mapped[str] = mapped_column(
         String(20),
         nullable=False,

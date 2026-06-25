@@ -51,7 +51,9 @@ def _scrape_vietcombank() -> list[dict]:
     now = datetime.now(timezone.utc)
 
     try:
-        resp = httpx.get(VCB_XML_URL, headers=HEADERS, timeout=15, follow_redirects=True)
+        resp = httpx.get(
+            VCB_XML_URL, headers=HEADERS, timeout=15, follow_redirects=True
+        )
         resp.raise_for_status()
     except httpx.HTTPError as exc:
         logger.warning("Vietcombank XML scrape failed: %s", exc)

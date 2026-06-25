@@ -31,6 +31,7 @@ HEADERS = {
 
 # ─── Helpers ────────────────────────────────────────────────────
 
+
 def _parse_price(text: str) -> Decimal | None:
     """Convert a Vietnamese price string like '82,000,000' or '82.000.000' to Decimal."""
     if not text:

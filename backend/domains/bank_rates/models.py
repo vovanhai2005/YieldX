@@ -26,9 +26,7 @@ class BankInterestRate(Base, TimeSeriesMixin):
 
     __tablename__ = "bank_interest_rates"
 
-    id: Mapped[int] = mapped_column(
-        BigInteger, primary_key=True, autoincrement=True
-    )
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     bank_code: Mapped[str] = mapped_column(
         String(20),
         nullable=False,

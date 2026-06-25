@@ -26,9 +26,7 @@ class ForexRate(Base, TimeSeriesMixin):
 
     __tablename__ = "forex_rates"
 
-    id: Mapped[int] = mapped_column(
-        BigInteger, primary_key=True, autoincrement=True
-    )
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     currency_code: Mapped[str] = mapped_column(
         String(3),
         nullable=False,

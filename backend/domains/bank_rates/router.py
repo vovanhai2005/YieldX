@@ -2,14 +2,14 @@
 API routes for the Bank Interest Rates domain.
 """
 
-from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Query
 from sqlalchemy import desc, distinct, func
-from sqlalchemy.orm import Session
 
-from core.db import get_db
+from core.db import SessionDep
+from core.params import HistoryParamsDep
+from domains.bank_rates.deps import ExistingBankDep
 from domains.bank_rates.models import BankInterestRate
 from domains.bank_rates.schemas import (
     BankListOut,
@@ -27,10 +27,12 @@ router = APIRouter(
 
 @router.get("/latest", response_model=BankRateLatestOut)
 def get_latest_bank_rates(
-    bank_code: Optional[str] = Query(None, description="Filter by bank code (e.g. VCB, TCB)"),
+    db: SessionDep,
+    bank_code: Optional[str] = Query(
+        None, description="Filter by bank code (e.g. VCB, TCB)"
+    ),
     term_months: Optional[int] = Query(None, description="Filter by term in months"),
     currency: str = Query("VND", description="Currency: VND or USD"),
-    db: Session = Depends(get_db),
 ):
     """Get the latest interest rate for each (bank_code, term_months) pair."""
     sub = (
@@ -71,13 +73,10 @@ def get_latest_bank_rates(
 
 @router.get("/history", response_model=BankRateLatestOut)
 def get_bank_rate_history(
+    db: SessionDep,
+    params: HistoryParamsDep,
     bank_code: Optional[str] = Query(None, description="Filter by bank code"),
     term_months: Optional[int] = Query(None, description="Filter by term in months"),
-    start_date: Optional[datetime] = Query(None, description="Start date (ISO 8601)"),
-    end_date: Optional[datetime] = Query(None, description="End date (ISO 8601)"),
-    limit: int = Query(100, ge=1, le=1000, description="Max records to return"),
-    offset: int = Query(0, ge=0, description="Records to skip"),
-    db: Session = Depends(get_db),
 ):
     """Get historical bank interest rates with optional filters and pagination."""
     query = db.query(BankInterestRate)
@@ -86,18 +85,33 @@ def get_bank_rate_history(
         query = query.filter(BankInterestRate.bank_code == bank_code.upper())
     if term_months is not None:
         query = query.filter(BankInterestRate.term_months == term_months)
-    if start_date:
-        query = query.filter(BankInterestRate.scraped_at >= start_date)
-    if end_date:
-        query = query.filter(BankInterestRate.scraped_at <= end_date)
+    if params.start_date:
+        query = query.filter(BankInterestRate.scraped_at >= params.start_date)
+    if params.end_date:
+        query = query.filter(BankInterestRate.scraped_at <= params.end_date)
 
-    query = query.order_by(desc(BankInterestRate.scraped_at)).offset(offset).limit(limit)
+    query = (
+        query.order_by(desc(BankInterestRate.scraped_at))
+        .offset(params.offset)
+        .limit(params.limit)
+    )
     results = query.all()
     return BankRateLatestOut(count=len(results), data=results)
 
 
+@router.get("/banks/{bank_code}", response_model=BankRateOut)
+def get_bank_detail(bank: ExistingBankDep):
+    """Get the most recent rate record for a single bank.
+
+    Demonstrates a chained dependency: `bank` resolves via `get_existing_bank`,
+    which itself depends on `SessionDep` -> `get_db`. Unlike the optional
+    `bank_code` filter on /latest and /history, this 404s if the bank doesn't exist.
+    """
+    return bank
+
+
 @router.get("/banks", response_model=BankListOut)
-def get_banks(db: Session = Depends(get_db)):
+def get_banks(db: SessionDep):
     """List all distinct banks with their codes and names."""
     banks = (
         db.query(
@@ -108,16 +122,14 @@ def get_banks(db: Session = Depends(get_db)):
         .order_by(BankInterestRate.bank_code)
         .all()
     )
-    return BankListOut(
-        banks=[{"code": b[0], "name": b[1]} for b in banks]
-    )
+    return BankListOut(banks=[{"code": b[0], "name": b[1]} for b in banks])
 
 
 @router.get("/compare", response_model=BankRateLatestOut)
 def compare_bank_rates(
+    db: SessionDep,
     term_months: int = Query(..., description="Deposit term in months to compare"),
     currency: str = Query("VND", description="Currency: VND or USD"),
-    db: Session = Depends(get_db),
 ):
     """Compare latest rates across all banks for a specific term."""
     sub = (

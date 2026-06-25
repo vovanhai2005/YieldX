@@ -2,14 +2,13 @@
 API routes for the Cryptocurrency domain.
 """
 
-from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Query
 from sqlalchemy import desc, func
-from sqlalchemy.orm import Session
 
-from core.db import get_db
+from core.db import SessionDep
+from core.params import HistoryParamsDep
 from domains.crypto.models import CryptoPrice
 from domains.crypto.schemas import (
     CryptoPriceLatestOut,
@@ -26,17 +25,14 @@ router = APIRouter(
 
 @router.get("/latest", response_model=CryptoPriceLatestOut)
 def get_latest_crypto_prices(
+    db: SessionDep,
     symbol: Optional[str] = Query(None, description="Filter by symbol (e.g. BTC, ETH)"),
-    db: Session = Depends(get_db),
 ):
     """Get the latest price for each cryptocurrency symbol."""
-    sub = (
-        db.query(
-            CryptoPrice.symbol,
-            func.max(CryptoPrice.scraped_at).label("max_scraped"),
-        )
-        .group_by(CryptoPrice.symbol)
-    )
+    sub = db.query(
+        CryptoPrice.symbol,
+        func.max(CryptoPrice.scraped_at).label("max_scraped"),
+    ).group_by(CryptoPrice.symbol)
     if symbol:
         sub = sub.filter(CryptoPrice.symbol == symbol.upper())
     sub = sub.subquery()
@@ -57,30 +53,31 @@ def get_latest_crypto_prices(
 
 @router.get("/history", response_model=CryptoPriceLatestOut)
 def get_crypto_history(
+    db: SessionDep,
+    params: HistoryParamsDep,
     symbol: Optional[str] = Query(None, description="Filter by symbol"),
-    start_date: Optional[datetime] = Query(None, description="Start date (ISO 8601)"),
-    end_date: Optional[datetime] = Query(None, description="End date (ISO 8601)"),
-    limit: int = Query(100, ge=1, le=1000, description="Max records to return"),
-    offset: int = Query(0, ge=0, description="Records to skip"),
-    db: Session = Depends(get_db),
 ):
     """Get historical crypto prices with optional filters and pagination."""
     query = db.query(CryptoPrice)
 
     if symbol:
         query = query.filter(CryptoPrice.symbol == symbol.upper())
-    if start_date:
-        query = query.filter(CryptoPrice.scraped_at >= start_date)
-    if end_date:
-        query = query.filter(CryptoPrice.scraped_at <= end_date)
+    if params.start_date:
+        query = query.filter(CryptoPrice.scraped_at >= params.start_date)
+    if params.end_date:
+        query = query.filter(CryptoPrice.scraped_at <= params.end_date)
 
-    query = query.order_by(desc(CryptoPrice.scraped_at)).offset(offset).limit(limit)
+    query = (
+        query.order_by(desc(CryptoPrice.scraped_at))
+        .offset(params.offset)
+        .limit(params.limit)
+    )
     results = query.all()
     return CryptoPriceLatestOut(count=len(results), data=results)
 
 
 @router.get("/symbols", response_model=SymbolListOut)
-def get_symbols(db: Session = Depends(get_db)):
+def get_symbols(db: SessionDep):
     """List all distinct cryptocurrency symbols."""
     symbols = (
         db.query(
@@ -91,9 +88,7 @@ def get_symbols(db: Session = Depends(get_db)):
         .order_by(CryptoPrice.symbol)
         .all()
     )
-    return SymbolListOut(
-        symbols=[{"symbol": s[0], "name": s[1]} for s in symbols]
-    )
+    return SymbolListOut(symbols=[{"symbol": s[0], "name": s[1]} for s in symbols])
 
 
 @router.post("/scrape", response_model=ScrapeResultOut)

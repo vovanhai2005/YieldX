@@ -2,14 +2,13 @@
 API routes for the Gold Price domain.
 """
 
-from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Query
 from sqlalchemy import desc, distinct, func
-from sqlalchemy.orm import Session
 
-from core.db import get_db
+from core.db import SessionDep
+from core.params import HistoryParamsDep
 from domains.gold.models import GoldPrice
 from domains.gold.schemas import (
     GoldBrandsOut,
@@ -27,19 +26,16 @@ router = APIRouter(
 
 @router.get("/latest", response_model=GoldPriceLatestOut)
 def get_latest_gold_prices(
+    db: SessionDep,
     brand: Optional[str] = Query(None, description="Filter by brand (e.g. SJC, DOJI)"),
-    db: Session = Depends(get_db),
 ):
     """Get the latest gold price for each (brand, product_type) pair."""
     # Subquery: max scraped_at per (brand, product_type)
-    sub = (
-        db.query(
-            GoldPrice.brand,
-            GoldPrice.product_type,
-            func.max(GoldPrice.scraped_at).label("max_scraped"),
-        )
-        .group_by(GoldPrice.brand, GoldPrice.product_type)
-    )
+    sub = db.query(
+        GoldPrice.brand,
+        GoldPrice.product_type,
+        func.max(GoldPrice.scraped_at).label("max_scraped"),
+    ).group_by(GoldPrice.brand, GoldPrice.product_type)
     if brand:
         sub = sub.filter(GoldPrice.brand == brand)
     sub = sub.subquery()
@@ -61,13 +57,10 @@ def get_latest_gold_prices(
 
 @router.get("/history", response_model=GoldPriceLatestOut)
 def get_gold_history(
+    db: SessionDep,
+    params: HistoryParamsDep,
     brand: Optional[str] = Query(None, description="Filter by brand"),
     product_type: Optional[str] = Query(None, description="Filter by product type"),
-    start_date: Optional[datetime] = Query(None, description="Start date (ISO 8601)"),
-    end_date: Optional[datetime] = Query(None, description="End date (ISO 8601)"),
-    limit: int = Query(100, ge=1, le=1000, description="Max records to return"),
-    offset: int = Query(0, ge=0, description="Records to skip"),
-    db: Session = Depends(get_db),
 ):
     """Get historical gold prices with optional filters and pagination."""
     query = db.query(GoldPrice)
@@ -76,18 +69,22 @@ def get_gold_history(
         query = query.filter(GoldPrice.brand == brand)
     if product_type:
         query = query.filter(GoldPrice.product_type == product_type)
-    if start_date:
-        query = query.filter(GoldPrice.scraped_at >= start_date)
-    if end_date:
-        query = query.filter(GoldPrice.scraped_at <= end_date)
+    if params.start_date:
+        query = query.filter(GoldPrice.scraped_at >= params.start_date)
+    if params.end_date:
+        query = query.filter(GoldPrice.scraped_at <= params.end_date)
 
-    query = query.order_by(desc(GoldPrice.scraped_at)).offset(offset).limit(limit)
+    query = (
+        query.order_by(desc(GoldPrice.scraped_at))
+        .offset(params.offset)
+        .limit(params.limit)
+    )
     results = query.all()
     return GoldPriceLatestOut(count=len(results), data=results)
 
 
 @router.get("/brands", response_model=GoldBrandsOut)
-def get_gold_brands(db: Session = Depends(get_db)):
+def get_gold_brands(db: SessionDep):
     """List all distinct gold brands."""
     brands = db.query(distinct(GoldPrice.brand)).order_by(GoldPrice.brand).all()
     return GoldBrandsOut(brands=[b[0] for b in brands])
